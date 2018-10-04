@@ -2,8 +2,7 @@
 // Copyright (c) 2017 Jesse W. Towner
 // See LICENSE.md file for license details
 
-#ifndef LUG_ERROR_HPP__
-#define LUG_ERROR_HPP__
+#pragma once
 
 #include <stdexcept>
 
@@ -24,5 +23,3 @@ class bad_grammar : public lug_error { public: bad_grammar() : lug_error{"invali
 class bad_opcode : public lug_error { public: bad_opcode() : lug_error{"invalid opcode"} {} };
 
 } // namespace lug
-
-#endif

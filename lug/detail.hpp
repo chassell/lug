@@ -2,8 +2,7 @@
 // Copyright (c) 2017 Jesse W. Towner
 // See LICENSE.md file for license details
 
-#ifndef LUG_DETAIL_HPP__
-#define LUG_DETAIL_HPP__
+#pragma once
 
 #include <algorithm>
 #include <functional>
@@ -230,5 +229,3 @@ inline Integral string_unpack(std::string_view s)
 } // namespace detail
 
 } // namespace lug
-
-#endif
