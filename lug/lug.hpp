@@ -441,6 +441,15 @@ struct directive_modifier
 	}
 };
 
+extern template struct directive_modifier<directives::caseless, directives::none, directives::eps>;
+extern template struct directive_modifier<directives::lexeme, directives::noskip, directives::eps>;
+extern template struct directive_modifier<directives::lexeme | directives::noskip, directives::none, directives::eps>;
+extern template struct directive_modifier<directives::none, directives::caseless, directives::eps>;
+extern template struct directive_modifier<directives::none, directives::none, directives::eps>;
+extern template struct directive_modifier<directives::none, directives::none, directives::none>;
+extern template struct directive_modifier<directives::postskip, directives::none, directives::eps>;
+extern template struct directive_modifier<directives::preskip, directives::postskip, directives::eps>;
+
 constexpr auto matches_eps = directive_modifier<directives::none, directives::none, directives::none>{};
 constexpr auto relays_eps = directive_modifier<directives::none, directives::none, directives::eps>{};
 constexpr auto skip_after = directive_modifier<directives::postskip, directives::none, directives::eps>{};

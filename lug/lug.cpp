@@ -672,4 +672,14 @@ void lug::basic_regular_expression::operator()(encoder& d) const
 	d.skip((program_->mandate & directives::eps) ^ directives::eps).append(*program_);
 }
 
+using lug::directives;
 
+template struct lug::directive_modifier<directives::none, directives::none, directives::none>;
+template struct lug::directive_modifier<directives::none, directives::none, directives::eps>;
+template struct lug::directive_modifier<directives::postskip, directives::none, directives::eps>;
+template struct lug::directive_modifier<directives::preskip, directives::postskip, directives::eps>;
+template struct lug::directive_modifier<directives::none, directives::caseless, directives::eps>;
+template struct lug::directive_modifier<directives::caseless, directives::none, directives::eps>;
+template struct lug::directive_modifier<directives::lexeme, directives::noskip, directives::eps>;
+template struct lug::directive_modifier<directives::lexeme | directives::noskip, directives::none, directives::eps>;
+template struct lug::directive_modifier<directives::none, directives::lexeme | directives::noskip, directives::eps>;

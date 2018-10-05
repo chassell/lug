@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ## sources
 set(SOURCES_LIB
@@ -19,7 +20,7 @@ include_directories("${lug_SOURCE_DIR}")
 
 ## properties
 # version info
-set_property(GLOBAL PROPERTY VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+set_property(GLOBAL PROPERTY VERSION ${VERSION_MAJOR}_${VERSION_MINOR}_${VERSION_PATCH})
 
 add_compile_options(-std=c++17)
 

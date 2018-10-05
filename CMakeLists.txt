@@ -7,10 +7,9 @@ set(VERSION_PATCH 0)
 
 # to configure the options specify them in in the command line or change them in the cmake UI.
 # Don't edit the makefile!
-option(LUG_BUILD_STATIC "Build static library" ON)
+option(LUG_BUILD_STATIC "Build static library" OFF)
 option(LUG_BUILD_SHARED "Build shared library" ON)
 option(LUG_BUILD_TESTS "Build tests" ON)
-option(CMAKE_EXPORT_COMPILE_COMMANDS "Create compile_commands.json" ON)
 # option(LUG_BUILD_SAMPLES "Build samples" ON)
 
 ## targets
