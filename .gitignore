@@ -259,3 +259,11 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+
+CMakeFiles/
+Makefile
+compile_commands.json
+cmake_install.cmake
+CMakeCache.txt
+*.plist
+*.so

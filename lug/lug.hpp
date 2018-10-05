@@ -339,16 +339,7 @@ public:
 };
 
 template <class RuneSet>
-inline auto&& add_rune_range(RuneSet&& runes, directives mode, char32_t first, char32_t last)
-{
-	if (first > last)
-		throw bad_character_range{};
-	if ((mode & directives::caseless) != directives::none)
-		unicode::push_casefolded_range(runes, first, last);
-	else
-		unicode::push_range(runes, first, last);
-	return ::std::move(runes);
-}
+auto add_rune_range(RuneSet&& runes, directives mode, char32_t first, char32_t last) -> RuneSet &&;
 
 class basic_regular_expression
 {
@@ -755,22 +746,11 @@ class parser
 		return matched;
 	}
 
+        // template lug::parser::commit<opcode::commit>
+        // template lug::parser::commit<opcode::commit_back>
+        // template lug::parser::commit<opcode::commit_partial>
 	template <opcode Opcode>
-	bool commit(std::size_t& sr, std::size_t& rc, std::ptrdiff_t& pc, int off)
-	{
-		if (stack_frames_.empty() || stack_frames_.back() != stack_frame_type::backtrack)
-			return false;
-		if constexpr (Opcode == opcode::commit_partial) {
-			detail::make_tuple_view<0, 1>(backtrack_stack_.back()) = {sr, rc};
-		} else {
-			detail::ignore(sr, rc);
-			if constexpr (Opcode == opcode::commit_back)
-				sr = std::get<0>(backtrack_stack_.back());
-			pop_stack_frame(backtrack_stack_);
-		}
-		pc += off;
-		return true;
-	}
+	bool commit(std::size_t& sr, std::size_t& rc, std::ptrdiff_t& pc, int off);
 
 	void accept(std::size_t sr, std::size_t mr, std::size_t rc, std::ptrdiff_t pc);
 
