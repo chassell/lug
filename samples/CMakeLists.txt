@@ -6,7 +6,7 @@ set(SAMPLE_SOURCES
     json.cpp
     )
 
-include_directories("${PROJECT_SOURCE_DIR}/lug")
+include_directories("${lug_SOURCE_DIR}")
 
 add_compile_options(-std=c++17)
 

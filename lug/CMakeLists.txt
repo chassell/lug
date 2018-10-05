@@ -15,7 +15,7 @@ set(HEADERS_LIB
     utf8.hpp
     )
 
-include_directories("${PROJECT_SOURCE_DIR}/lug")
+include_directories("${lug_SOURCE_DIR}")
 
 ## properties
 # version info
@@ -33,7 +33,6 @@ endif ()
 if (LUG_BUILD_SHARED)
     add_library(lug-shared SHARED ${SOURCES_LIB} ${HEADERS_LIB})
     set_property(TARGET lug-shared PROPERTY OUTPUT_NAME lug)
-    set_property(TARGET lug-shared PROPERTY COMPILE_FLAGS -DLUG_SHARED)
 
     set_target_properties(lug-shared PROPERTIES
         VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
