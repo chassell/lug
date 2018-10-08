@@ -16,8 +16,6 @@ using std::endl;
                   : stack_frames_.back() == stack_frame_type::capture ? "cap" \
                   : std::to_string(static_cast<int>(stack_frames_.back())) )
 
-#define ACT_DEBUG(info)  { std::cerr << "***** act:" << info << " *****" << std::endl; }
-
 #define PARSE_DEBUG(info)  { \
                 if ( stack_frames_.empty() ) { \
                      std::cerr << ">>> "; \
@@ -31,11 +29,22 @@ using std::endl;
                      std::cerr << std::string(stack_frames_.size()*2,' ') << "!!!! " << stack_frames_.size() << "/" << FRAME_STR << " "; \
                 } \
                 std::cerr << "-- " << (info) << " in+" << sr << ":" << INPUT_DEBUG; }
+
+#if defined(NDEBUG)
+#define OP_DEBUG(info)
+#define PE_DEBUG(info,pe)
+#define STR_DEBUG(info,str)
+#define RSP_DEBUG(info,str)
+#define ACT_DEBUG(info)
+#else
 #define OP_DEBUG(info)  { PARSE_DEBUG(info); std::cerr << std::endl; }
 #define PE_DEBUG(info,pe)  { PARSE_DEBUG(info); std::cerr << " set:" << lug::unicode::to_string((pe),str) << std::endl; }
 #define STR_DEBUG(info,str)  { PARSE_DEBUG(info); ( (str).empty() ? std::cerr : std::cerr << " str:\""s + std::string(str) + "\"" ) << std::endl; }
 #define RSP_DEBUG(info,str) { \
                 PARSE_DEBUG(info); std::cerr << std::endl; std::cerr << std::string(responses_.size()*2,'=') << " imm:"s << std::string(str) << std::endl; }
+#define ACT_DEBUG(info)  { std::cerr << "***** act:" << info << " *****" << std::endl; }
+#endif
+
 
 std::function<void(lug::encoder&)> lug::grammar::implicit_space{lug::language::nop};
 
