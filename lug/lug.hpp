@@ -174,7 +174,7 @@ public:
 	grammar() = default;
 	void swap(grammar& g) { program_.swap(g.program_); }
 	lug::program const& program() const noexcept { return program_; };
-	static thread_local std::function<void(encoder&)> implicit_space;
+	static std::function<void(encoder&)> implicit_space;
 };
 
 class syntax
@@ -675,11 +675,18 @@ inline auto operator ""_srx(char const* s, std::size_t n) { return cased[basic_r
 
 struct implicit_space_rule
 {
+        std::function<void(encoder&)> save_;
+
 	template <class E, class = std::enable_if_t<is_expression_v<E>>>
-	implicit_space_rule(E const& e)
+	implicit_space_rule(E const& e) : save_{grammar::implicit_space}
 	{
 		grammar::implicit_space = std::function<void(encoder&)>{make_expression(e)};
 	}
+
+        ~implicit_space_rule() 
+        {
+                grammar::implicit_space = std::move(save_);
+        }
 };
 
 template <class E, class = std::enable_if_t<is_expression_v<E>>>
@@ -810,7 +817,7 @@ inline auto operator%(variable<T>& v, E const& e)
 
 } // namespace language
 
-inline thread_local std::function<void(encoder&)> grammar::implicit_space{language::operator*(language::space)};
+inline std::function<void(encoder&)> grammar::implicit_space{language::operator*(language::space)};
 
 inline grammar start(rule const& start_rule)
 {
