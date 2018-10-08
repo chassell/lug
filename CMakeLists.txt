@@ -12,6 +12,8 @@ option(LUG_BUILD_SHARED "Build shared library" ON)
 option(LUG_BUILD_TESTS "Build tests" ON)
 # option(LUG_BUILD_SAMPLES "Build samples" ON)
 
+add_compile_options(-fabi-version=11)
+
 ## targets
 if (LUG_BUILD_STATIC OR LUG_BUILD_SHARED)
     add_subdirectory("lug" ${LUG_BINARY_DIR})

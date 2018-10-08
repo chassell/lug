@@ -32,7 +32,7 @@ public:
 		using namespace lug::language;
 		rule Expr;
 
-		implicit_space_rule SP = *"[ \t]"_rx;
+                implicit_space_rule BLANK = lexeme[ *"[ \t]"_rx ];
 
 		rule NL		= lexeme["\n"_sx | "\r\n" | "\r"];
 		rule Func	= lexeme[capture(id_)["[A-Za-z]"_rx > *"[0-9A-Za-z]"_rx]] <[this]{ return lug::utf8::toupper(*id_); };
@@ -111,7 +111,7 @@ public:
 					| "STOP"_isx                                <[this]{ haltline_ = line_; line_ = lines_.end(); }
 					| "END"_isx                                 <[this]{ if (line_ == lines_.end()) std::exit(EXIT_SUCCESS); line_ = lines_.end(); }
 					| ("EXIT"_isx | "QUIT"_isx)                 <[this]{ std::exit(EXIT_SUCCESS); }
-					| "REM"_isx > *(!NL > any);
+					| "REM"_isx > *(!NL);
 
 		rule Cmnd	= "CLEAR"_isx                               <[this]{ lines_.clear(); }
 					| "CONT"_isx                                <[this]{ cont(); }

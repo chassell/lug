@@ -14,6 +14,11 @@
 #include <vector>
 #include <string>
 
+extern template class std::unordered_map<std::size_t, std::string>;
+extern template class std::unordered_map<unsigned short, double>;
+extern template class std::unordered_map<unsigned short, int>;
+extern template class std::vector<std::any>;
+
 using namespace std::literals::string_literals;
 namespace lug
 {
@@ -63,17 +68,20 @@ union instruction
 {
 	static constexpr std::size_t maxstrlen = 256;
 	struct prefix { opcode op; operands aux; unsigned short val; } pf;
-	int off;
+	int off{};
 	std::array<char, 4> str;
 
 	instruction(opcode op, operands aux, immediate imm) : pf{op, aux, static_cast<unsigned short>(imm)} {}
 	instruction(std::ptrdiff_t o) : off{static_cast<int>(o)} { if (off != o) throw program_limit_error{}; }
 	instruction(std::string_view s) { std::fill(std::copy_n(s.begin(), (std::min)(s.size(), std::size_t{4}), str.begin()), str.end(), char{0}); }
+	instruction() = default;
 
 	static auto decode(std::vector<instruction> const& code, std::ptrdiff_t& pc);
 
 	static std::ptrdiff_t length(prefix pf) noexcept;
+
 };
+
 
 static_assert(sizeof(unicode::ctype) <= sizeof(immediate), "immediate must be large enough to hold unicode::ctype");
 static_assert(sizeof(unicode::sctype) <= sizeof(immediate), "immediate must be large enough to hold unicode::sctype");
@@ -133,7 +141,7 @@ public:
 	grammar() = default;
 	void swap(grammar& g) { program_.swap(g.program_); }
 	lug::program const& program() const noexcept { return program_; };
-	static thread_local std::function<void(encoder&)> implicit_space;
+	static std::function<void(encoder&)> implicit_space;
 };
 
 class syntax
@@ -544,11 +552,18 @@ inline auto operator ""_srx(char const* s, std::size_t n) { return cased[basic_r
 
 struct implicit_space_rule
 {
+        std::function<void(encoder&)> save_;
+
 	template <class E, class = std::enable_if_t<is_expression_v<E>>>
-	implicit_space_rule(E const& e)
+	implicit_space_rule(E const& e) : save_{grammar::implicit_space}
 	{
 		grammar::implicit_space = std::function<void(encoder&)>{make_expression(e)};
 	}
+
+        ~implicit_space_rule() 
+        {
+                grammar::implicit_space = std::move(save_);
+        }
 };
 
 template <class E, class = std::enable_if_t<is_expression_v<E>>>
@@ -678,8 +693,6 @@ inline auto operator%(variable<T>& v, E const& e)
 }
 
 } // namespace language
-
-inline thread_local std::function<void(encoder&)> grammar::implicit_space{language::operator*(language::space)};
 
 grammar start(rule const& start_rule);
 
@@ -898,3 +911,13 @@ LUG_DIAGNOSTIC_PUSH_AND_IGNORE
 LUG_DIAGNOSTIC_POP
 
 } // namespace lug
+
+extern template class std::vector<lug::instruction>;
+extern template class std::vector<std::tuple<lug::rule const*, lug::program const*, std::ptrdiff_t, lug::directives>>;
+extern template class std::vector<lug::instruction>;
+extern template class std::vector<lug::unicode::rune_set>;
+extern template class std::vector<lug::semantic_predicate>;
+extern template class std::vector<lug::semantic_action>;
+extern template class std::vector<lug::syntactic_capture>;
+extern template class std::vector<lug::semantic_response>;
+extern template class std::vector<enum lug::directives>;

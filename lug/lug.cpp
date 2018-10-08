@@ -3,13 +3,41 @@
 
 #include <vector>
 #include <string>
+#include <cstring>
 #include <memory>
 
-#define INPUT_DEBUG  ( sr < input_.size() && input_[sr] >= ' ' ? ( "'"s + std::string(1,input_[sr]) + "'"s ) : "$" )
+using std::endl;
 
-#define PE_DEBUG(info,pe)  { std::cerr << info << " -- @op:" << static_cast<int>(op) << " in+" << sr << ":" << INPUT_DEBUG << " set:" << lug::unicode::to_string(pe,str) << std::endl; }
-#define OP_DEBUG(info)  { std::cerr << info << " -- @op:" << static_cast<int>(op) << " in+" << sr << ":" << INPUT_DEBUG << "" << std::endl; }
-#define STR_DEBUG(info,str)  { std::cerr << info << " -- @op:" << static_cast<int>(op) << " in+" << sr << ":" << INPUT_DEBUG << ( str.empty() ? "" : " str:"s + std::string(str) ) << std::endl; }
+#define INPUT_DEBUG  ( sr >= input_.size() ? "$" : input_[sr] < ' ' ? "???"s + std::to_string(input_[sr]+0) : ( "'"s + std::string(1,input_[sr]) + "'"s ) )
+
+#define FRAME_STR ( stack_frames_.back() == stack_frame_type::backtrack ? "bt" \
+                  : stack_frames_.back() == stack_frame_type::lrcall ? "lrc" \
+                  : stack_frames_.back() == stack_frame_type::call ? "cll" \
+                  : stack_frames_.back() == stack_frame_type::capture ? "cap" \
+                  : std::to_string(static_cast<int>(stack_frames_.back())) )
+
+#define ACT_DEBUG(info)  { std::cerr << "***** act:" << info << " *****" << std::endl; }
+
+#define PARSE_DEBUG(info)  { \
+                if ( stack_frames_.empty() ) { \
+                     std::cerr << ">>> "; \
+                } else if ( !std::strncmp("begin",info,5) ) { \
+                     std::cerr << std::string(stack_frames_.size()*2,' ') << "|--> (#" << stack_frames_.size() << "/" << FRAME_STR << ") "; \
+                } else if ( !std::strncmp("end",info,3) ) { \
+                     std::cerr << std::string(stack_frames_.size()*2,' ') << "|<-- (#" << stack_frames_.size() << "/" << FRAME_STR << ") "; \
+                } else if ( info[0] != '!' ) { \
+                     std::cerr << std::string(stack_frames_.size()*2,' ') << "[" << stack_frames_.size() << "/" << FRAME_STR << "] "; \
+                } else if ( info[0] == '!' ) { \
+                     std::cerr << std::string(stack_frames_.size()*2,' ') << "!!!! " << stack_frames_.size() << "/" << FRAME_STR << " "; \
+                } \
+                std::cerr << "-- " << (info) << " in+" << sr << ":" << INPUT_DEBUG; }
+#define OP_DEBUG(info)  { PARSE_DEBUG(info); std::cerr << std::endl; }
+#define PE_DEBUG(info,pe)  { PARSE_DEBUG(info); std::cerr << " set:" << lug::unicode::to_string((pe),str) << std::endl; }
+#define STR_DEBUG(info,str)  { PARSE_DEBUG(info); ( (str).empty() ? std::cerr : std::cerr << " str:\""s + std::string(str) + "\"" ) << std::endl; }
+#define RSP_DEBUG(info,str) { \
+                PARSE_DEBUG(info); std::cerr << std::endl; std::cerr << std::string(responses_.size()*2,'=') << " imm:"s << std::string(str) << std::endl; }
+
+std::function<void(lug::encoder&)> lug::grammar::implicit_space{lug::language::nop};
 
 template <class RuneSet>
 auto lug::add_rune_range(RuneSet&& runes, directives mode, char32_t first, char32_t last) -> RuneSet &&
@@ -369,9 +397,15 @@ bool lug::parser::commit(std::size_t& sr, std::size_t& rc, std::ptrdiff_t& pc, i
         if constexpr (Opcode == opcode::commit_partial) {
                 detail::make_tuple_view<0, 1>(backtrack_stack_.back()) = {sr, rc};
         } else {
+                auto op = Opcode;
                 detail::ignore(sr, rc);
                 if constexpr (Opcode == opcode::commit_back)
+                {
                         sr = std::get<0>(backtrack_stack_.back());
+                        OP_DEBUG("end commit-back");
+                } else {
+                    OP_DEBUG("end commit-fwd");
+                }
                 pop_stack_frame(backtrack_stack_);
         }
         pc += off;
@@ -403,18 +437,18 @@ bool lug::parser::parse()
                     case opcode::match: {
                             if (!match_sequence(sr, str, [this](auto i, auto n, auto s) { return input_.compare(i, n, s) == 0; }))
                                 {
-                                    STR_DEBUG("!match",str);
+                                    STR_DEBUG("!match",s);
                                     goto failure;
                                 }
-                                STR_DEBUG("match",str);
+                                STR_DEBUG("CONSUME match",s);
                     } break;
                     case opcode::match_casefold: {
-                            if (!match_sequence(sr, str, [this](auto i, auto n, auto s) { return casefold_compare(i, n, s) == 0; }))
+                            if (!match_sequence(sr, s, [this](auto i, auto n, auto s) { return casefold_compare(i, n, s) == 0; }))
                                 {
-                                    STR_DEBUG("!match-case",str);
+                                    STR_DEBUG("!match-case",s);
                                     goto failure;
                                 }
-                            STR_DEBUG("match-case",str);
+                            STR_DEBUG("CONSUME match-case",s);
                     } break;
                     case opcode::match_any: {
                             if (!match_single(sr, []{ return true; }))
@@ -422,31 +456,31 @@ bool lug::parser::parse()
                                     OP_DEBUG("!any");
                                     goto failure;
                                 }
-                            OP_DEBUG("any");
+                            OP_DEBUG("CONSUME any");
                     } break;
                     case opcode::match_any_of: {
                             if (!match_single(sr, [pe, s](auto const& r) { return unicode::any_of(r, pe, s); }))
                                 {
-                                    PE_DEBUG("!any",pe);
+                                    PE_DEBUG("!prop-any",pe);
                                     goto failure;
                                 }
-                                PE_DEBUG("any",pe);
+                                PE_DEBUG("CONSUME prop-any",pe);
                     } break;
                     case opcode::match_all_of: {
                             if (!match_single(sr, [pe, s](auto const& r) { return unicode::all_of(r, pe, s); }))
                                 {
-                                    PE_DEBUG("!all",pe);
+                                    PE_DEBUG("!prop-all",pe);
                                     goto failure;
                                 }
-                                PE_DEBUG("all",pe);
+                                PE_DEBUG("CONSUME prop-all",pe);
                     } break;
                     case opcode::match_none_of: {
                             if (!match_single(sr, [pe, s](auto const& r) { return unicode::none_of(r, pe, s); }))
                                 {
-                                    PE_DEBUG("!none",pe);
+                                    PE_DEBUG("!prop-none",pe);
                                     goto failure;
                                 }
-                                PE_DEBUG("none",pe);
+                                PE_DEBUG("CONSUME prop-none",pe);
                     } break;
                     case opcode::match_set: {
                             auto imm_copy = imm;
@@ -454,10 +488,10 @@ bool lug::parser::parse()
                                             auto interval = std::lower_bound(runes.begin(), runes.end(), rune, [](auto& x, auto& y) { return x.second < y; });
                                             return interval != runes.end() && interval->first <= rune && rune <= interval->second; }))
                                 {
-                                    STR_DEBUG("!set",immstr);
+                                    STR_DEBUG("!rune-set",immstr);
                                     goto failure;
                                 }
-                                STR_DEBUG("set",immstr);
+                                STR_DEBUG("CONSUME rune-set",immstr);
                     } break;
                     case opcode::match_eol: {
                             if (!match_single(sr, [](auto curr, auto last, auto& next, char32_t rune) {
@@ -468,15 +502,15 @@ bool lug::parser::parse()
                                                             next = next2;
                                             return true; }))
                                 {
-                                    OP_DEBUG("!eol");
+                                    OP_DEBUG("!match-eol");
                                     goto failure;
                                 }
-                                OP_DEBUG("eol");
+                                OP_DEBUG("CONSUME match-eol");
                     } break;
                     case opcode::choice: {
-                            OP_DEBUG("try");
                             stack_frames_.push_back(stack_frame_type::backtrack);
                             backtrack_stack_.emplace_back(sr - imm, rc, pc + off);
+                            OP_DEBUG("begin backtrack");
                     } break;
                     case opcode::commit: {
                             if (!commit<opcode::commit>(sr, rc, pc, off))
@@ -484,7 +518,6 @@ bool lug::parser::parse()
                                     OP_DEBUG("!commit");
                                     goto failure;
                                 }
-                                OP_DEBUG("commit");
                     } break;
                     case opcode::commit_back: {
                             if (!commit<opcode::commit_back>(sr, rc, pc, off))
@@ -492,7 +525,6 @@ bool lug::parser::parse()
                                     OP_DEBUG("!commit_back");
                                     goto failure;
                                 }
-                                OP_DEBUG("commit_back");
                     } break;
                     case opcode::commit_partial: {
                             if (!commit<opcode::commit_partial>(sr, rc, pc, off))
@@ -503,6 +535,7 @@ bool lug::parser::parse()
                                 OP_DEBUG("commit_partial");
                     } break;
                     case opcode::jump: {
+                            STR_DEBUG("jump", std::to_string(pc+off));
                             pc += off;
                     } break;
                     case opcode::call: {
@@ -512,8 +545,8 @@ bool lug::parser::parse()
                                     if (memo != lrmemo_stack_.crend()) {
                                             if (memo->sra == lrfailcode || imm < memo->prec)
                                                 {
-                                                    goto failure;
                                                     STR_DEBUG("!call-failed",immstr);
+                                                    goto failure;
                                                 }
                                             sr = memo->sra, rc = restore_responses_after(rc, memo->responses);
                                             STR_DEBUG("!call-failed-continue",immstr);
@@ -521,12 +554,13 @@ bool lug::parser::parse()
                                     }
                                     stack_frames_.push_back(stack_frame_type::lrcall);
                                     lrmemo_stack_.push_back({sr, lrfailcode, imm, pc, pc + off, rc, std::vector<semantic_response>{}});
+                                    STR_DEBUG("begin lr-call",std::to_string(pc+off));
                             } else {
                                     stack_frames_.push_back(stack_frame_type::call);
                                     call_stack_.push_back(pc);
+                                    STR_DEBUG("begin pc-call", std::to_string(pc+off));
                             }
                             pc += off;
-                            STR_DEBUG("call",immstr);
                     } break;
                     case opcode::ret: {
                             if (stack_frames_.empty())
@@ -537,44 +571,48 @@ bool lug::parser::parse()
                             switch (stack_frames_.back()) {
                                     case stack_frame_type::call: {
                                             pc = call_stack_.back();
+                                            OP_DEBUG("end call w/ret");
                                             pop_stack_frame(call_stack_);
-                                            OP_DEBUG("ret");
                                     } break;
                                     case stack_frame_type::lrcall: {
                                             auto& memo = lrmemo_stack_.back();
                                             if (memo.sra == lrfailcode || sr > memo.sra) {
                                                     memo.sra = sr, memo.responses = drop_responses_after(memo.rcr);
                                                     sr = memo.srr, pc = memo.pca, rc = memo.rcr;
-                                                    OP_DEBUG("ret-lrcall-fail-continue");
+                                                    OP_DEBUG("fail ret-lrcall continue");
                                                     continue;
                                             }
                                             sr = memo.sra, pc = memo.pcr, rc = restore_responses_after(memo.rcr, memo.responses);
+                                            OP_DEBUG("end lrcall w/ret");
                                             pop_stack_frame(lrmemo_stack_, sr, mr, rc, pc);
-                                            OP_DEBUG("ret-lrcall");
                                     } break;
                                     default: 
-                                    OP_DEBUG("ret-deflt-fail");
+                                    OP_DEBUG("!fail ret");
                                     goto failure;
                             }
                     } break;
                     case opcode::fail: {
-                            OP_DEBUG("fail-fail");
+                            OP_DEBUG("fail-op");
                             fc = imm;
                     failure:
                             for (mr = (std::max)(mr, sr), ++fc; fc > 0; --fc) {
                                     if (done = cut_frame_ >= stack_frames_.size(); done) {
                                             registers_ = {sr, mr, rc, pc, 0};
+                                            OP_DEBUG("fail end-loop fail");
                                             break;
                                     }
                                     switch (stack_frames_.back()) {
                                             case stack_frame_type::backtrack: {
                                                     std::tie(sr, rc, pc) = backtrack_stack_.back();
+                                                    OP_DEBUG("end backtrack-fail");
                                                     pop_stack_frame(backtrack_stack_);
                                             } break;
                                             case stack_frame_type::call: {
+                                                    OP_DEBUG("end call-fail");
                                                     pop_stack_frame(call_stack_), ++fc;
                                             } break;
                                             case stack_frame_type::capture: {
+                                                    OP_DEBUG("end capture-fail");
                                                     pop_stack_frame(capture_stack_, sr, mr, rc, pc), ++fc;
                                             } break;
                                             case stack_frame_type::lrcall: {
@@ -582,22 +620,27 @@ bool lug::parser::parse()
                                                             sr = memo.sra, pc = memo.pcr, rc = restore_responses_after(memo.rcr, memo.responses);
                                                     else
                                                             ++fc;
+                                                    OP_DEBUG("end lrcall-fail");
                                                     pop_stack_frame(lrmemo_stack_, sr, mr, rc, pc);
                                             } break;
-                                            default: break;
+                                            default: 
+                                                    OP_DEBUG("fail default-fail");
+                                                    break;
                                     }
                             }
                             pop_responses_after(rc);
                     } break;
                     case opcode::accept: {
-                            OP_DEBUG("accept");
                             if (cut_deferred_ = !capture_stack_.empty() || !lrmemo_stack_.empty(); !cut_deferred_) {
+                                    OP_DEBUG("accept-non-final");
                                     accept(sr, mr, rc, pc);
                                     std::tie(sr, mr, rc, pc, std::ignore) = drain();
+                            } else {
+                                    OP_DEBUG("null accept");
                             }
                     } break;
                     case opcode::accept_final: {
-                            OP_DEBUG("accept-final");
+                            OP_DEBUG("accept end-loop");
                             accept(sr, mr, rc, pc);
                             result = done = true;
                     } break;
@@ -605,39 +648,41 @@ bool lug::parser::parse()
                             registers_ = {sr, (std::max)(mr, sr), rc, pc, 0};
                             bool accepted = prog.predicates[imm](*this);
                             std::tie(sr, mr, rc, pc, fc) = registers_.as_tuple();
+                            STR_DEBUG("pre-predicate",immstr);
                             pop_responses_after(rc);
                             if (!accepted)
                                 {
+                                    STR_DEBUG("!predicate",immstr);
                                     goto failure;
                                 }
+                            STR_DEBUG("predicate",immstr);
                     } break;
                     case opcode::action: {
-                            OP_DEBUG("action");
                             rc = push_response(call_stack_.size() + lrmemo_stack_.size(), imm);
+                            RSP_DEBUG("push action",immstr);
                     } break;
                     case opcode::begin: {
-                            OP_DEBUG("begin");
                             stack_frames_.push_back(stack_frame_type::capture);
                             capture_stack_.push_back(static_cast<subject_location>(sr));
+                            OP_DEBUG("begin capture");
                     } break;
                     case opcode::end: {
                             if (stack_frames_.empty() || stack_frames_.back() != stack_frame_type::capture)
                                 {
-                                    OP_DEBUG("end-fail");
+                                    OP_DEBUG("!end-fail");
                                     goto failure;
                                 }
-                            OP_DEBUG("end");
                             auto sr0 = static_cast<std::size_t>(capture_stack_.back()), sr1 = sr;
+                            STR_DEBUG("end capture with", match().substr(sr0, sr1 - sr0));
                             pop_stack_frame(capture_stack_, sr, mr, rc, pc);
                             if (sr0 > sr1)
                                 {
-                                    OP_DEBUG("pop-fail");
+                                    OP_DEBUG("!after end push-response");
                                     goto failure;
                                 }
-                            OP_DEBUG("push-response");
                             rc = push_response(call_stack_.size() + lrmemo_stack_.size(), imm, {sr0, sr1 - sr0});
                     } break;
-                    default: registers_ = {sr, (std::max)(mr, sr), rc, pc, 0}; throw bad_opcode{};
+                    default: registers_ = {sr, (std::max)(mr, sr), rc, pc, 0}; OP_DEBUG("bad opcode"); throw bad_opcode{};
             }
     }
     return result;
@@ -671,6 +716,20 @@ void lug::basic_regular_expression::operator()(encoder& d) const
 	}
 	d.skip((program_->mandate & directives::eps) ^ directives::eps).append(*program_);
 }
+
+template class std::unordered_map<std::size_t, std::string>;
+template class std::unordered_map<unsigned short, double>;
+template class std::unordered_map<unsigned short, int>;
+template class std::vector<std::any>;
+
+template class std::vector<std::tuple<lug::rule const*, lug::program const*, std::ptrdiff_t, lug::directives>>;
+template class std::vector<lug::instruction>;
+template class std::vector<lug::unicode::rune_set>;
+template class std::vector<lug::semantic_predicate>;
+template class std::vector<lug::semantic_action>;
+template class std::vector<lug::syntactic_capture>;
+template class std::vector<lug::semantic_response>;
+template class std::vector<lug::directives>;
 
 using lug::directives;
 

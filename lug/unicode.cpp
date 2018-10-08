@@ -166,6 +166,26 @@ std::optional<ctype> stoctype(std::string_view s)
 	return c != labels.end() && c->first == l ? std::optional<ctype>{static_cast<ctype>(c->second)} : std::nullopt;
 }
 
+// Convert from text to ctype property
+std::string ctypetos(uint16_t r)
+{
+	using namespace std::string_view_literals;
+	using ct = ctype;
+
+	static constexpr std::array<std::pair<std::string_view, ctype>, 13> labels =
+	{ {
+		{ "alnum"sv, ct::alnum }, { "alpha"sv, ct::alpha }, { "blank"sv, ct::blank }, { "cntrl"sv, ct::cntrl },
+		{ "digit"sv, ct::digit }, { "graph"sv, ct::graph }, { "lower"sv, ct::lower }, { "print"sv, ct::print },
+		{ "punct"sv, ct::punct }, { "space"sv, ct::space }, { "upper"sv, ct::upper }, { "word"sv, ct::word },
+		{ "xdigit"sv, ct::xdigit }
+	} };
+
+	std::string str;
+	auto c = std::for_each(labels.begin(), labels.end(), [r,&str](auto const& x) { ( static_cast<uint16_t>(x.second) & r ? (str.append(x.first).append("|")) : str); });
+	if ( !str.empty() ) { str.pop_back(); }
+	return str;
+}
+
 // Convert from text to ptype property
 std::optional<ptype> stoptype(std::string_view s)
 {
@@ -1172,7 +1192,7 @@ std::string to_string(property_enum penum, std::string_view str)
 
     switch (penum) {
             case property_enum::ptype: ret.remove_prefix(64-53); retv = "p"s + std::string(ret); break; // 53
-            case property_enum::ctype: ret.remove_prefix(64-12); retv = "c"s + std::string(ret); break; // 16 bits wide
+            case property_enum::ctype: retv = "ct["s + ctypetos(result) + "]"s; break; // 16 bits wide
             case property_enum::agetype: ret.remove_prefix(64-6); retv = "age"s + std::string(ret); break; // 6 bits wide
             case property_enum::blktype: ret.remove_prefix(64-10); retv = "blk"s + std::string(ret); break; // 10 bits wide
             case property_enum::gctype: ret.remove_prefix(64-6); retv = "gc"s + std::string(ret); break; // 6 bits wide
